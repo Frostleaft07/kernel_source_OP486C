@@ -37,11 +37,6 @@ jobs:
       run: |
         ./build
 
-    - name: Set Properties
-      id: props
-      run: |
-        echo "date=$(TZ=Asia/Manila date +%Y%m%d-%I%M%p)" >> $GITHUB_OUTPUT
-
     - name: Compressed as Archive
       run: |
         git clone https://github.com/nathannxx/AnyKernel3 ~/any/ && \
@@ -53,7 +48,7 @@ jobs:
       with:
         files: |
           /home/runner/any/BuildTest-${{ github.run_id }}.zip
-        name: BuildTest-${{ github.run_id }}
-        tag_name: ${{ github.run_id }}
+        name: BuildTest
+        tag_name: buildtest
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
