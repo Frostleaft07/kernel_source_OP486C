@@ -59,9 +59,19 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	{S5K5E8YX_SENSOR_ID, 0x5a, Common_read_region},
 	{S5K5E8YXREAR2_SENSOR_ID, 0x5a, Common_read_region},
     #ifdef ODM_HQ_EDIT
-    {HI556_SENSOR_ID, 0x40, Hi556_read_region},
-    {S5K3H7YX_SENSOR_ID, 0x20, s5k3h7yx_read_region},
+	{HI556_SENSOR_ID, 0x40, Hi556_read_region},
+	{S5K3H7YX_SENSOR_ID, 0x20, s5k3h7yx_read_region},
+	{GC5035_SENSOR_ID, 0xA4, gc5035_read_region},
+	{S5K3H7YX_TXD_SENSOR_ID, 0x20, s5k3h7yx_txd_read_region},
+	{GC5035_OFG_SENSOR_ID, 0xA8, gc5035_ofg_read_region},
+	{S5K3H7YX_TS_SENSOR_ID, 0x20, s5k3h7yx_ts_read_region},
     #endif
+	//Cong.Zhou@ODM_HQ.Camera.Driver. 20190219 add for shuimitao
+	//rear camera hi1336 otp
+	{HI1336_SENSOR_ID, 0xA0, Common_read_region},
+	//fengbin@ODM_HQ.Camera.Driver. 20190309 add for honeypeatch
+	//rear camera s5k3l6 otp
+	{S5K3L6_SENSOR_ID, 0xA0, Common_read_region},
 	/*  ADD before this line */
 	{0, 0, 0}       /*end of list */
 };
