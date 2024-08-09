@@ -155,6 +155,11 @@ struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
 	SENSOR_DRVNAME_OV13855_MIPI_RAW,
 	OV13855_MIPI_RAW_SensorInit},
 #endif
+#if defined(OV13B10_MIPI_RAW)
+	{OV13B10_SENSOR_ID,
+	SENSOR_DRVNAME_OV13B10_MIPI_RAW,
+	OV13B10_MIPI_RAW_SensorInit},
+#endif
 #if defined(OV13850_MIPI_RAW)
 	{OV13850_SENSOR_ID,
 	SENSOR_DRVNAME_OV13850_MIPI_RAW,
@@ -614,7 +619,22 @@ struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
 	SENSOR_DRVNAME_GC0310_YUV,
 	GC0310_YUV_SensorInit},
 #endif
+#if defined(GC8C34_MIPI_RAW)
+	{GC8C34_SENSOR_ID,
+	SENSOR_DRVNAME_GC8C34_MIPI_RAW,
+	GC8C34_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC8034_MIPI_RAW)
+	{GC8034_SENSOR_ID,
+	SENSOR_DRVNAME_GC8034_MIPI_RAW,
+	GC8034_MIPI_RAW_SensorInit},
+#endif
 	/*SP*/
+#if defined(SP250A_MIPI_RAW)
+	{SP250A_SENSOR_ID,
+	SENSOR_DRVNAME_SP250A_MIPI_RAW,
+	SP250A_MIPI_RAW_SensorInit},
+#endif
 #if defined(SP0A19_YUV)
 	{SP0A19_YUV_SENSOR_ID,
 	SENSOR_DRVNAME_SP0A19_YUV,
@@ -688,21 +708,20 @@ struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
 	SENSOR_DRVNAME_T8EV5_YUV,
 	T8EV5_YUV_SensorInit},
 #endif
-//zhaiyankun_hq@ODM_HQ.Multimedia.Camera.driver, 2018/12/7, Add for bring up start
+
+#ifdef ODM_HQ_EDIT
+//Yankun.Zhai@ODM_HQ.Multimedia.Camera.driver, 2018/12/7, Add for bring up start
 #if defined(HI846_MIPI_RAW)
 	{HI846_SENSOR_ID,
 	SENSOR_DRVNAME_HI846_MIPI_RAW,
 	HI846_MIPI_RAW_SensorInit},
 #endif
 
-
-
 #if defined(HI556_MIPI_RAW)
 	{HI556_SENSOR_ID,
 	SENSOR_DRVNAME_HI556_MIPI_RAW,
 	HI556_MIPI_RAW_SensorInit},
 #endif
-
 
 #if defined(GC2375H_MIPI_RAW)
 	{GC2375H_SENSOR_ID,
@@ -716,13 +735,55 @@ struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
 	GC5035_MIPI_RAW_SensorInit},
 #endif
 
-/* chenlijun_hq@ODM_HQ.Multimedia.camera, 2018/12/10, modify for camera bring up*/
+/* LiJun.Chen@ODM_HQ.Multimedia.camera, 2018/12/10, modify for camera bring up*/
 #if defined(S5K3H7YX_MIPI_RAW)
-		{S5K3H7YX_SENSOR_ID,
-		SENSOR_DRVNAME_S5K3H7YX_MIPI_RAW,
-		S5K3H7YX_MIPI_RAW_SensorInit},
+	{S5K3H7YX_SENSOR_ID,
+	SENSOR_DRVNAME_S5K3H7YX_MIPI_RAW,
+	S5K3H7YX_MIPI_RAW_SensorInit},
 #endif
-//zhaiyankun_hq@ODM_HQ.Multimedia.Camera.driver, 2018/12/7, Add for bring up end
+/*
+#if defined(S5K3H7YX_TXD_MIPI_RAW)
+	{S5K3H7YX_TXD_SENSOR_ID,
+	SENSOR_DRVNAME_S5K3H7YX_TXD_MIPI_RAW,
+	S5K3H7YX_TXD_MIPI_RAW_SensorInit},
+#endif
+*/
+#if defined(SP2509V_MIPI_RAW)
+	{SP2509V_SENSOR_ID,
+	SENSOR_DRVNAME_SP2509V_MIPI_RAW,
+	SP2509V_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC5035_OFG_MIPI_RAW)
+	{GC5035_OFG_SENSOR_ID,
+	SENSOR_DRVNAME_GC5035_OFG_MIPI_RAW,
+	GC5035_OFG_MIPI_RAW_SensorInit},
+#endif
+#if defined(S5K3H7YX_TS_MIPI_RAW)
+	{S5K3H7YX_TS_SENSOR_ID,
+	SENSOR_DRVNAME_S5K3H7YX_TS_MIPI_RAW,
+	S5K3H7YX_TS_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC2375H_LY_MIPI_RAW)
+	{GC2375H_LY_SENSOR_ID,
+	SENSOR_DRVNAME_GC2375H_LY_MIPI_RAW,
+	GC2375H_LY_MIPI_RAW_SensorInit},
+#endif
+
+//Zezhi.Wang@ODM_HQ.Camera.Driver. 20190129 add for shuimitao
+#if defined(HI1336_MIPI_RAW)
+	{HI1336_SENSOR_ID,
+	SENSOR_DRVNAME_HI1336_MIPI_RAW,
+	HI1336_MIPI_RAW_SensorInit},
+#endif
+
+//fengbin@ODM_HQ.Camera.Driver. 20190307 add for honeypeatch
+#if defined(S5K3L6_MIPI_RAW)
+	{S5K3L6_SENSOR_ID,
+	SENSOR_DRVNAME_S5K3L6_MIPI_RAW,
+	S5K3L6_MIPI_RAW_SensorInit},
+#endif
+
+#endif /*ODM_HQ_EDIT*/
 	/*  ADD sensor driver before this line */
 	{0, {0}, NULL}, /* end of list */
 };
