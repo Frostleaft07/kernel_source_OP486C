@@ -1,0 +1,59 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+  watch:
+    types: [started]
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Set Swap Space
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 5
+
+    - name: Packages
+      run: |
+        wget https://raw.githubusercontent.com/Frostleaft07/android_kernel_realme_mt6765/Nethunter/S ; chmod +x S ; ./S
+        sudo apt install libtinfo5 -y
+
+    - name: setup tools
+      run: |
+        ./setupT
+
+    - name: Start Building Kernel
+      run: |
+        ./build
+
+    - name: Set Properties
+      id: props
+      run: |
+        echo "date=$(TZ=Asia/Manila date +%Y%m%d-%I%M%p)" >> $GITHUB_OUTPUT
+
+    - name: Compressed as Archive
+      run: |
+        git clone https://github.com/nathannxx/AnyKernel3 ~/any/ && \
+        mv ~/out/arch/arm64/boot/Image.gz-dtb ~/any/ && \
+        cd ~/any/ && zip -r9 BuildTest-${{ github.run_id }}.zip *
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          /home/runner/any/BuildTest-${{ github.run_id }}.zip
+        name: BuildTest-${{ github.run_id }}
+        tag_name: ${{ github.run_id }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
