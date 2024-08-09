@@ -105,6 +105,13 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 				 * 63secs of retransmission with the
 				 * current initial RTO.
 				 */
+#ifdef VENDOR_EDIT
+//Yongyao.Song@PSW.NW.DATA.1097684,2017/10/02
+//modify for connect timeout too long
+//add for fin retrans too many
+#define TCP_ORPHAN_RETRIES 3
+#endif /*VENDOR_EDIT*/
+
 
 #define TCP_SYNACK_RETRIES 5	/* This is how may retries are done
 				 * when passive opening a connection.
@@ -271,10 +278,17 @@ extern int sysctl_tcp_autocorking;
 extern int sysctl_tcp_invalid_ratelimit;
 extern int sysctl_tcp_pacing_ss_ratio;
 extern int sysctl_tcp_pacing_ca_ratio;
+extern int sysctl_tcp_default_init_rwnd;
 
 extern atomic_long_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;
 extern int tcp_memory_pressure;
+
+#ifdef VENDOR_EDIT
+//Ming.Liu@PSW.CN.WiFi.Network.quality.1065762, 2016/10/09,
+//add for: [monitor tcp info]
+extern int sysctl_tcp_info_print;
+#endif /* VENDOR_EDIT */
 
 /* optimized version of sk_under_memory_pressure() for TCP sockets */
 static inline bool tcp_under_memory_pressure(const struct sock *sk)
@@ -1510,6 +1524,9 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 			      struct tcp_fastopen_cookie *foc,
 			      struct dst_entry *dst);
 void tcp_fastopen_init_key_once(bool publish);
+bool tcp_fastopen_cookie_check(struct sock *sk, u16 *mss,
+			     struct tcp_fastopen_cookie *cookie);
+bool tcp_fastopen_defer_connect(struct sock *sk, int *err);
 #define TCP_FASTOPEN_KEY_LENGTH 16
 
 /* Fastopen key context */

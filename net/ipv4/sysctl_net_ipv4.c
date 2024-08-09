@@ -152,6 +152,21 @@ static int ipv4_ping_group_range(struct ctl_table *table, int write,
 	return ret;
 }
 
+/* Validate changes from /proc interface. */
+static int proc_tcp_default_init_rwnd(struct ctl_table *ctl, int write,
+				      void __user *buffer,
+				      size_t *lenp, loff_t *ppos)
+{
+	int old_value = *(int *)ctl->data;
+	int ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
+	int new_value = *(int *)ctl->data;
+
+	if (write && ret == 0 && (new_value < 3 || new_value > 100))
+		*(int *)ctl->data = old_value;
+
+	return ret;
+}
+
 static int proc_tcp_congestion_control(struct ctl_table *ctl, int write,
 				       void __user *buffer, size_t *lenp, loff_t *ppos)
 {
@@ -633,6 +648,13 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec_ms_jiffies,
 	},
 	{
+		.procname       = "tcp_default_init_rwnd",
+		.data           = &sysctl_tcp_default_init_rwnd,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_tcp_default_init_rwnd
+	},
+	{
 		.procname	= "icmp_msgs_per_sec",
 		.data		= &sysctl_icmp_msgs_per_sec,
 		.maxlen		= sizeof(int),
@@ -671,6 +693,17 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &one
 	},
+	#ifdef VENDOR_EDIT
+    //Ming.Liu@PSW.CN.WiFi.Network.quality.1065762, 2016/10/09,
+    //add for: [monitor tcp info]
+	{
+		.procname	= "tcp_info_print",
+		.data		= &sysctl_tcp_info_print,
+		.maxlen		= sizeof(int),
+		.mode		= 0664,
+		.proc_handler	= proc_do_print_tcpinfo
+	},
+    #endif /* VENDOR_EDIT */
 	{ }
 };
 

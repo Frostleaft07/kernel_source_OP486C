@@ -227,6 +227,7 @@ source "fs/orangefs/Kconfig"
 source "fs/adfs/Kconfig"
 source "fs/affs/Kconfig"
 source "fs/ecryptfs/Kconfig"
+source "fs/sdcardfs/Kconfig"
 source "fs/hfs/Kconfig"
 source "fs/hfsplus/Kconfig"
 source "fs/befs/Kconfig"
@@ -308,5 +309,8 @@ endif # NETWORK_FILESYSTEMS
 
 source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
-
+#ifdef ODM_HQ_EDIT
+#Wenchao.Du@ODM_HQ.BSP.Storage.FS, 2019/01/09, config exFAT&NTFS filesystem
+source "fs/exfat/Kconfig"
+#endif
 endmenu

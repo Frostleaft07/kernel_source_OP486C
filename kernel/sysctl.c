@@ -63,6 +63,13 @@
 #include <linux/capability.h>
 #include <linux/binfmts.h>
 #include <linux/sched/sysctl.h>
+
+#ifdef VENDOR_EDIT
+//Ming.Liu@PSW.CN.WiFi.Network.quality.1065762, 2016/10/09
+//add for: [monitor tcp info]
+#include <net/tcp.h>
+#endif /* VENDOR_EDIT */
+
 #include <linux/kexec.h>
 #include <linux/bpf.h>
 #include <linux/mount.h>
@@ -127,6 +134,8 @@ static int __maybe_unused four = 4;
 static unsigned long one_ul = 1;
 static int one_hundred = 100;
 static int one_thousand = 1000;
+#endif
+
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -308,6 +317,58 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &max_sched_granularity_ns,
 	},
 	{
+		.procname	= "sched_sync_hint_enable",
+		.data		= &sysctl_sched_sync_hint_enable,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname       = "sched_isolation_hint",
+		.data           = &sysctl_sched_isolation_hint_enable,
+		.maxlen         = sizeof(unsigned int),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec,
+	},
+#ifdef CONFIG_SCHED_WALT
+	{
+		.procname	= "sched_use_walt_cpu_util",
+		.data		= &sysctl_sched_use_walt_cpu_util,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#ifdef CONFIG_SCHED_DEBUG
+	{
+		.procname	= "sched_use_walt_task_util",
+		.data		= &sysctl_sched_use_walt_task_util,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_walt_init_task_load_pct",
+		.data		= &sysctl_sched_walt_init_task_load_pct,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_walt_cpu_high_irqload",
+		.data		= &sysctl_sched_walt_cpu_high_irqload,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
+	{
+		.procname	= "sched_cstate_aware",
+		.data		= &sysctl_sched_cstate_aware,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
 		.procname	= "sched_wakeup_granularity_ns",
 		.data		= &sysctl_sched_wakeup_granularity,
 		.maxlen		= sizeof(unsigned int),
@@ -345,7 +406,8 @@ static struct ctl_table kern_table[] = {
 		.data		= &sysctl_sched_time_avg,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
 	},
 	{
 		.procname	= "sched_shares_window_ns",
@@ -353,6 +415,15 @@ static struct ctl_table kern_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sched_big_task_rotation",
+		.data		= &sysctl_sched_rotation_enable,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
 	},
 #ifdef CONFIG_SCHEDSTATS
 	{
@@ -448,6 +519,31 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &one,
 	},
+#endif
+#ifdef CONFIG_SCHED_TUNE
+	{
+		.procname	= "sched_cfs_boost",
+		.data		= &sysctl_sched_cfs_boost,
+		.maxlen		= sizeof(sysctl_sched_cfs_boost),
+#ifdef CONFIG_CGROUP_SCHEDTUNE
+		.mode		= 0444,
+#else
+		.mode		= 0644,
+#endif
+		.proc_handler	= &sysctl_sched_cfs_boost_handler,
+		.extra1		= &zero,
+		.extra2		= &one_hundred,
+	},
+#ifdef CONFIG_CGROUP_SCHEDTUNE
+	{
+		.procname	= "sched_stune_task_threshold",
+		.data		= &stune_task_threshold,
+		.maxlen		= sizeof(stune_task_threshold),
+		.mode		= 0644,
+		.proc_handler   = &sched_stune_task_threshold_handler,
+	},
+#endif
+
 #endif
 #ifdef CONFIG_PROVE_LOCKING
 	{
@@ -1267,7 +1363,7 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= overcommit_kbytes_handler,
 	},
 	{
-		.procname	= "page-cluster", 
+		.procname	= "page-cluster",
 		.data		= &page_cluster,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
@@ -1336,6 +1432,34 @@ static struct ctl_table vm_table[] = {
 		.mode           = 0444 /* read-only */,
 		.proc_handler   = pdflush_proc_obsolete,
 	},
+#ifdef CONFIG_MEMCG
+	{
+		.procname	= "vmpressure_level_med",
+		.data		= &vmpressure_level_med,
+		.maxlen		= sizeof(vmpressure_level_med),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &vmpressure_level_critical,
+	},
+	{
+		.procname	= "vmpressure_level_critical",
+		.data		= &vmpressure_level_critical,
+		.maxlen		= sizeof(vmpressure_level_critical),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &vmpressure_level_med,
+		.extra2		= &one_hundred,
+	},
+	{
+		.procname	= "vmpressure_win",
+		.data		= &vmpressure_win,
+		.maxlen		= sizeof(vmpressure_win),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+	},
+#endif
 	{
 		.procname	= "swappiness",
 		.data		= &vm_swappiness,
@@ -1766,7 +1890,7 @@ static struct ctl_table fs_table[] = {
 		.mode		= 0555,
 		.child		= inotify_table,
 	},
-#endif	
+#endif
 #ifdef CONFIG_EPOLL
 	{
 		.procname	= "epoll",
@@ -2171,12 +2295,12 @@ static int __do_proc_dointvec(void *tbl_data, struct ctl_table *table,
 	int *i, vleft, first = 1, err = 0;
 	size_t left;
 	char *kbuf = NULL, *p;
-	
+
 	if (!tbl_data || !table->maxlen || !*lenp || (*ppos && !write)) {
 		*lenp = 0;
 		return 0;
 	}
-	
+
 	i = (int *) tbl_data;
 	vleft = table->maxlen / sizeof(*i);
 	left = *lenp;
@@ -2271,7 +2395,7 @@ static int do_proc_dointvec(struct ctl_table *table, int write,
  * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
- * values from/to the user buffer, treated as an ASCII string. 
+ * values from/to the user buffer, treated as an ASCII string.
  *
  * Returns 0 on success.
  */
@@ -2280,6 +2404,153 @@ int proc_dointvec(struct ctl_table *table, int write,
 {
 	return do_proc_dointvec(table, write, buffer, lenp, ppos, NULL, NULL);
 }
+
+#ifdef VENDOR_EDIT
+//Ming.Liu@PSW.CN.WiFi.Network.quality.1065762, 2016/10/09,
+//add for: [monitor tcp info]
+static int proc_put_string(void __user **dst_buf, size_t *buf_size, char * src_str, int str_len)
+{
+	if (*buf_size >= str_len) {
+		char __user **buffer = (char __user **)dst_buf;
+		if ( copy_to_user(*buffer, src_str, str_len)) {
+			printk(KERN_INFO "[proc_put_string] return -EFAULT; \n");
+			return -EFAULT;
+		}
+		(*buf_size) -= str_len;
+		(*buffer) += str_len;
+		*dst_buf = *buffer;
+		return 0;
+	}
+
+	return -EFAULT;
+}
+
+static int proc_string_memcpy(void **dst_buf, size_t *buf_size, char * src_str, int str_len)
+{
+	if (*buf_size >= str_len) {
+		char **buffer = (char **)dst_buf;
+		memcpy(*buffer, src_str, str_len);
+		(*buf_size) -= str_len;
+		(*buffer) += str_len;
+		*dst_buf = *buffer;
+		return 0;
+	}
+
+	return -EFAULT;
+}
+
+
+
+static int proc_put_one_tcpinfo(void **dst_buf, size_t *buf_size, struct tcp_info *info)
+{
+	char tmp[500];
+	int len;
+
+
+
+	len = sprintf(tmp, "state=%-10u ca_state=%-10u options=%-10u rto=%-10u ato=%-10u unacked=%-10u last_d_s=%-10u last_d_r=%-10u last_a_r=%-10u rtt=%-10u rcv_space=%-10u t_retrans=%-10u \n",
+					info->tcpi_state, info->tcpi_ca_state, info->tcpi_options, info->tcpi_rto, info->tcpi_ato, info->tcpi_unacked,
+					info->tcpi_last_data_sent, info->tcpi_last_data_recv, info->tcpi_last_ack_recv, info->tcpi_rtt, info->tcpi_rcv_space, info->tcpi_total_retrans);
+
+	if (proc_string_memcpy(dst_buf, buf_size, tmp, len)) {
+		return -EFAULT;
+	}
+	return 0;
+}
+
+
+int proc_do_print_tcpinfo(struct ctl_table *table, int write,
+		     void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	size_t left_count = *lenp;
+	size_t temp_len = *lenp;
+	void *mem_buff_ptr = NULL;
+	void *temp_buff_ptr = NULL;
+	int tcp_info_print = -1;
+
+	if (table->data) {
+		tcp_info_print = *((int *)table->data);
+	}
+
+	if ((tcp_info_print < 0) && (!table->data || !table->maxlen || !*lenp || (*ppos && !write))) {
+		*lenp = 0;
+		return 0;
+	}
+
+
+	if (! write && buffer) {
+		struct tcp_info tcpinfo;
+		unsigned int bucket;
+
+		int print_counter = -1;
+
+		mem_buff_ptr = kmalloc(left_count, GFP_ATOMIC);
+		if (!mem_buff_ptr) {
+			printk(KERN_INFO "[proc_do_tcpinfoprint] kmalloc is fail; mem_buff_ptr = NULL\n");
+			goto put_return;
+		}
+		temp_buff_ptr = mem_buff_ptr;
+
+		for (bucket = 0; bucket <= tcp_hashinfo.ehash_mask; bucket++) {
+			struct sock *sk;
+			struct hlist_nulls_node *node;
+			spinlock_t *lock = inet_ehash_lockp(&tcp_hashinfo, bucket);
+			spin_lock_bh(lock);
+
+			sk_nulls_for_each(sk, node, &tcp_hashinfo.ehash[bucket].chain) {
+
+				//Fix bug1102870: tcp_get_info cause APPS Crash
+				sock_hold(sk);
+
+				if ((sk->sk_state == TCP_TIME_WAIT) || (sk->sk_state == TCP_NEW_SYN_RECV)) {
+					__sock_put(sk);
+					continue;
+				}
+
+				print_counter ++;
+
+				if (print_counter < tcp_info_print) {
+					__sock_put(sk);
+					continue;
+				}
+
+
+				tcp_get_info(sk, &tcpinfo);
+				//Fix bug1102870: tcp_get_info cause APPS Crash
+				__sock_put(sk);
+
+				if (proc_put_one_tcpinfo(&temp_buff_ptr, &left_count, &tcpinfo)) {
+					if (table->data) {  //save print tcpinfo sk index
+					    *((int *)table->data) = print_counter;
+					}
+					spin_unlock_bh(lock);
+					goto put_return;
+				}
+
+			}
+			spin_unlock_bh(lock);
+		}
+		if (table->data) {  //recover tcp_info_print value
+			*((int *)table->data) = -1;
+		}
+
+	}
+
+
+put_return:
+
+	if (mem_buff_ptr) {
+		proc_put_string(&buffer, &temp_len, mem_buff_ptr, (*lenp) - left_count);
+		kfree(mem_buff_ptr);
+	}
+	*lenp -= left_count;
+	*ppos += left_count;
+
+
+
+	return 0;
+}
+#endif /* VENDOR_EDIT */
 
 /**
  * proc_douintvec - read a vector of unsigned integers
@@ -2662,7 +2933,7 @@ static int do_proc_dointvec_ms_jiffies_conv(bool *negp, unsigned long *lvalp,
  * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
- * values from/to the user buffer, treated as an ASCII string. 
+ * values from/to the user buffer, treated as an ASCII string.
  * The values read are assumed to be in seconds, and are converted into
  * jiffies.
  *
@@ -2684,8 +2955,8 @@ int proc_dointvec_jiffies(struct ctl_table *table, int write,
  * @ppos: pointer to the file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
- * values from/to the user buffer, treated as an ASCII string. 
- * The values read are assumed to be in 1/USER_HZ seconds, and 
+ * values from/to the user buffer, treated as an ASCII string.
+ * The values read are assumed to be in 1/USER_HZ seconds, and
  * are converted into jiffies.
  *
  * Returns 0 on success.
@@ -2707,8 +2978,8 @@ int proc_dointvec_userhz_jiffies(struct ctl_table *table, int write,
  * @ppos: the current position in the file
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
- * values from/to the user buffer, treated as an ASCII string. 
- * The values read are assumed to be in 1/1000 seconds, and 
+ * values from/to the user buffer, treated as an ASCII string.
+ * The values read are assumed to be in 1/1000 seconds, and
  * are converted into jiffies.
  *
  * Returns 0 on success.

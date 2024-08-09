@@ -105,6 +105,12 @@ struct nf_conn {
 	/* all members below initialized via memset */
 	u8 __nfct_init_offset[0];
 
+	#ifdef VENDOR_EDIT
+	//Yuan.Huang@PSW.CN.WiFi.Network.internet.1461349, 2018/06/18,
+	//Add for WeChat lucky money recognition
+	u32 oppo_app_uid;
+	#endif /* VENDOR_EDIT */
+
 	/* If we were expected by an expectation, this will be it */
 	struct nf_conn *master;
 
@@ -306,7 +312,7 @@ static inline bool nf_ct_should_gc(const struct nf_conn *ct)
 
 struct kernel_param;
 
-int nf_conntrack_set_hashsize(const char *val, struct kernel_param *kp);
+int nf_conntrack_set_hashsize(const char *val, const struct kernel_param *kp);
 int nf_conntrack_hash_resize(unsigned int hashsize);
 
 extern struct hlist_nulls_head *nf_conntrack_hash;

@@ -127,6 +127,56 @@ static void release_task_mempolicy(struct proc_maps_private *priv)
 }
 #endif
 
+static void seq_print_vma_name(struct seq_file *m, struct vm_area_struct *vma)
+{
+	const char __user *name = vma_get_anon_name(vma);
+	struct mm_struct *mm = vma->vm_mm;
+
+	unsigned long page_start_vaddr;
+	unsigned long page_offset;
+	unsigned long num_pages;
+	unsigned long max_len = NAME_MAX;
+	int i;
+
+	page_start_vaddr = (unsigned long)name & PAGE_MASK;
+	page_offset = (unsigned long)name - page_start_vaddr;
+	num_pages = DIV_ROUND_UP(page_offset + max_len, PAGE_SIZE);
+
+	seq_puts(m, "[anon:");
+
+	for (i = 0; i < num_pages; i++) {
+		int len;
+		int write_len;
+		const char *kaddr;
+		long pages_pinned;
+		struct page *page;
+
+		pages_pinned = get_user_pages_remote(current, mm,
+				page_start_vaddr, 1, 0, &page, NULL);
+		if (pages_pinned < 1) {
+			seq_puts(m, "<fault>]");
+			return;
+		}
+
+		kaddr = (const char *)kmap(page);
+		len = min(max_len, PAGE_SIZE - page_offset);
+		write_len = strnlen(kaddr + page_offset, len);
+		seq_write(m, kaddr + page_offset, write_len);
+		kunmap(page);
+		put_page(page);
+
+		/* if strnlen hit a null terminator then we're done */
+		if (write_len != len)
+			break;
+
+		max_len -= len;
+		page_offset = 0;
+		page_start_vaddr += PAGE_SIZE;
+	}
+
+	seq_putc(m, ']');
+}
+
 static void vma_stop(struct proc_maps_private *priv)
 {
 	struct mm_struct *mm = priv->mm;
@@ -341,8 +391,15 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 			goto done;
 		}
 
-		if (is_stack(priv, vma))
+		if (is_stack(priv, vma)) {
 			name = "[stack]";
+			goto done;
+		}
+
+		if (vma_get_anon_name(vma)) {
+			seq_pad(m, ' ');
+			seq_print_vma_name(m, vma);
+		}
 	}
 
 done:
@@ -754,7 +811,35 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 	/* mmap_sem is held in m_start */
 	walk_page_vma(vma, &smaps_walk);
 
+#ifdef VENDOR_EDIT //yixue.ge@bsp.drv modify for android.bg get pss too slow
+	if (strcmp(current->comm, "android.bg") == 0) {
+		if ((unsigned long)(mss.pss >> (10 + PSS_SHIFT)) > 0) {
+			seq_printf(m,
+				"Pss:            %8lu kB\n",
+			(	unsigned long)(mss.pss >> (10 + PSS_SHIFT)));
+		}
+		if ((mss.private_clean >> 10) > 0) {
+			seq_printf(m,
+				"Private_Clean:  %8lu kB\n",
+				mss.private_clean >> 10);
+		}
+		if ((mss.private_dirty >> 10) > 0) {
+			seq_printf(m,
+				"Private_Dirty:  %8lu kB\n",
+				mss.private_dirty >> 10);
+		}
+		m_cache_vma(m, vma);
+		return 0;
+	}
+#endif /*VENDOR_EDIT*/
+
 	show_map_vma(m, vma, is_pid);
+
+	if (vma_get_anon_name(vma)) {
+		seq_puts(m, "Name:           ");
+		seq_print_vma_name(m, vma);
+		seq_putc(m, '\n');
+	}
 
 	seq_printf(m,
 		   "Size:           %8lu kB\n"

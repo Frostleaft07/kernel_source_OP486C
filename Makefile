@@ -303,7 +303,7 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
+HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
 HOSTCXXFLAGS = -O2
 
 ifeq ($(shell $(HOSTCC) -v 2>&1 | grep -c "clang version"), 1)
@@ -348,6 +348,7 @@ include scripts/Kbuild.include
 # Make variables (CC, etc...)
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
+LDGOLD		= $(CROSS_COMPILE)ld.gold
 CC		= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
@@ -388,7 +389,9 @@ LINUXINCLUDE    := \
 		-I$(objtree)/arch/$(hdr-arch)/include/generated/uapi \
 		-I$(objtree)/arch/$(hdr-arch)/include/generated \
 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
-		-I$(objtree)/include
+		-I$(srctree)/drivers/misc/mediatek/include \
+		-I$(objtree)/include \
+		-I$(srctree)/drivers/misc/mediatek/include
 
 LINUXINCLUDE	+= $(filter-out $(LINUXINCLUDE),$(USERINCLUDE))
 
@@ -405,6 +408,85 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 GCC_PLUGINS_CFLAGS :=
+
+
+#ifdef VENDOR_EDIT
+#Bin.Yan@PSW.AD.BuildConfig.BaseConfig.1068615, 2017/08/28,Add for disallow system remount
+ifneq ($(SPECIAL_OPPO_CONFIG),1)
+ifneq ($(SPECIAL_OPPO_PERFORMANCE),1)
+    ifneq ($(filter release,$(OPPO_BUILD_TYPE)),)
+        ifneq ($(OPPO_ALLOW_KEY_INTERFACES),true)
+            ifeq ($(filter allnetcttest allnetcmcctest allnetcmccfield allnetctfield,$(NET_BUILD_TYPE)),)
+                KBUILD_CFLAGS += -DOPPO_DISALLOW_KEY_INTERFACES
+            endif
+        endif
+    endif
+endif
+endif
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT
+#Haiping.Zhong@PSW.AD.BuildConfig.BaseConfig.0, 2019/01/08, Add for build root disable dm verity
+ifeq ($(OPPO_BUILD_ROOT_DISABLE_DM_VERITY),true)
+    KBUILD_CFLAGS += -DOPPO_BUILD_ROOT_DISABLE_DM_VERITY
+endif
+#endif /* VENDOR_EDIT */
+
+
+
+#ifdef  VENDOR_EDIT
+#LiPing-m@PSW.MM.Display.LCD.Machine, 2017/11/03, Add for VENDOR_EDIT macro in kernel
+KBUILD_CFLAGS +=   -DVENDOR_EDIT
+KBUILD_CPPFLAGS += -DVENDOR_EDIT
+CFLAGS_KERNEL +=   -DVENDOR_EDIT
+CFLAGS_MODULE +=   -DVENDOR_EDIT
+#endif /* VENDOR_EDIT */
+
+#ifdef ODM_HQ_EDIT
+#Qiuyu.Fan 2018/10/03,Add for ODM_HQ_EDIT maco in kernel
+KBUILD_CFLAGS   += -DODM_HQ_EDIT
+KBUILD_CPPFLAGS += -DODM_HQ_EDIT
+CFLAGS_KERNEL   += -DODM_HQ_EDIT
+CFLAGS_MODULE   += -DODM_HQ_EDIT
+export ODM_HQ_EDIT=yes
+#endif
+
+#ifdef VENDOR_EDIT
+#ye.zhang@Sensor.config,2016-09-09, add for CTSI support external storage or not
+$(info @@@@@@@@@@@ 111 OPPO_BUILD_CUSTOMIZE is $(OPPO_BUILD_CUSTOMIZE))
+ifneq ($(OPPO_BUILD_CUSTOMIZE),)
+$(info @@@@@@@@@@@ 222 OPPO_BUILD_CUSTOMIZE is $(OPPO_BUILD_CUSTOMIZE))
+KBUILD_CFLAGS += -DMOUNT_EXSTORAGE_IF
+KBUILD_CPPFLAGS += -DMOUNT_EXSTORAGE_IF
+CFLAGS_KERNEL += -DMOUNT_EXSTORAGE_IF
+CFLAGS_MODULE += -DMOUNT_EXSTORAGE_IF
+endif
+#endif
+
+#ifdef VENDOR_EDIT
+#ifdef VENDOR_EDIT
+#Qiao.Hu@BSP.CHG.Basic, 2017/12/18,add for recogonizing release build
+ifeq ($(OPPO_BUILD_TYPE),release)
+KBUILD_CFLAGS += -DCONFIG_OPPO_REALEASE_BUILD
+KBUILD_CPPFLAGS += -DCONFIG_OPPO_REALEASE_BUILD
+endif
+
+#Guohua.Zhong@BSP.Storage.Sdcard 2018/01/18 ,add for recogonizing release build
+ifneq ($(filter release cts cta,$(OPPO_BUILD_TYPE)),)
+KBUILD_CFLAGS += -DOPPO_RELEASE_FLAG
+KBUILD_CPPFLAGS += -DOPPO_RELEASE_FLAG
+endif
+ifneq ($(filter cmcctest cmccfield allnetcttest,$(NET_BUILD_TYPE)),)
+KBUILD_CFLAGS += -DOPPO_RELEASE_FLAG
+KBUILD_CPPFLAGS += -DOPPO_RELEASE_FLAG
+endif
+#endif /* VENDOR_EDIT */
+#Ling.Guo@PSW.MM.Display.LCD, 2018/01/24, Add for cmcc test.
+ifneq ($(filter allnetcmccfield allnetcmcctest allnetctfield allnetcttest allnetcutest,$(NET_BUILD_TYPE)),)
+KBUILD_CFLAGS += -DOPPO_CTTEST_FLAG
+KBUILD_CPPFLAGS += -DOPPO_CTTEST_FLAG
+endif
+#endif /* VENDOR_EDIT */
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
@@ -623,6 +705,20 @@ CFLAGS_GCOV	:= -fprofile-arcs -ftest-coverage -fno-tree-loop-im $(call cc-disabl
 CFLAGS_KCOV	:= $(call cc-option,-fsanitize-coverage=trace-pc,)
 export CFLAGS_GCOV CFLAGS_KCOV
 
+# Make toolchain changes before including arch/$(SRCARCH)/Makefile to ensure
+# ar/cc/ld-* macros return correct values.
+ifdef CONFIG_LTO_CLANG
+# use GNU gold with LLVMgold for LTO linking, and LD for vmlinux_link
+LDFINAL_vmlinux := $(LD)
+LD		:= $(LDGOLD)
+LDFLAGS		+= -plugin LLVMgold.so
+# use llvm-ar for building symbol tables from IR files, and llvm-dis instead
+# of objdump for processing symbol versions and exports
+LLVM_AR		:= llvm-ar
+LLVM_DIS	:= llvm-dis
+export LLVM_AR LLVM_DIS
+endif
+
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
 # values of the respective KBUILD_* variables
 ARCH_CPPFLAGS :=
@@ -642,8 +738,56 @@ KBUILD_CFLAGS	+= $(call cc-option,-ffunction-sections,)
 KBUILD_CFLAGS	+= $(call cc-option,-fdata-sections,)
 endif
 
+ifdef CONFIG_LTO_CLANG
+lto-clang-flags	:= -flto -fvisibility=hidden
+
+# allow disabling only clang LTO where needed
+DISABLE_LTO_CLANG := -fno-lto -fvisibility=default
+export DISABLE_LTO_CLANG
+endif
+
+ifdef CONFIG_LTO
+lto-flags	:= $(lto-clang-flags)
+KBUILD_CFLAGS	+= $(lto-flags)
+
+DISABLE_LTO	:= $(DISABLE_LTO_CLANG)
+export DISABLE_LTO
+
+# LDFINAL_vmlinux and LDFLAGS_FINAL_vmlinux can be set to override
+# the linker and flags for vmlinux_link.
+export LDFINAL_vmlinux LDFLAGS_FINAL_vmlinux
+endif
+
+ifdef CONFIG_CFI_CLANG
+cfi-clang-flags	+= -fsanitize=cfi
+DISABLE_CFI_CLANG := -fno-sanitize=cfi
+ifdef CONFIG_MODULES
+cfi-clang-flags	+= -fsanitize-cfi-cross-dso
+DISABLE_CFI_CLANG += -fno-sanitize-cfi-cross-dso
+endif
+ifdef CONFIG_CFI_PERMISSIVE
+cfi-clang-flags	+= -fsanitize-recover=cfi -fno-sanitize-trap=cfi
+endif
+
+# also disable CFI when LTO is disabled
+DISABLE_LTO_CLANG += $(DISABLE_CFI_CLANG)
+# allow disabling only clang CFI where needed
+export DISABLE_CFI_CLANG
+endif
+
+ifdef CONFIG_CFI
+# cfi-flags are re-tested in prepare-compiler-check
+cfi-flags	:= $(cfi-clang-flags)
+KBUILD_CFLAGS	+= $(cfi-flags)
+
+DISABLE_CFI	:= $(DISABLE_CFI_CLANG)
+DISABLE_LTO	+= $(DISABLE_CFI)
+export DISABLE_CFI
+endif
+
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS	+= $(call cc-option,-Oz,-Os)
+KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized,)
 else
 ifdef CONFIG_PROFILE_ALL_BRANCHES
 KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
@@ -703,11 +847,22 @@ endif
 KBUILD_CFLAGS += $(stackp-flag)
 
 ifeq ($(cc-name),clang)
+ifneq ($(CROSS_COMPILE),)
+CLANG_TRIPLE    ?= $(CROSS_COMPILE)
+CLANG_TARGET	:= --target=$(notdir $(CLANG_TRIPLE:%-=%))
+GCC_TOOLCHAIN	:= $(realpath $(dir $(shell which $(LD)))/..)
+endif
+ifneq ($(GCC_TOOLCHAIN),)
+CLANG_GCC_TC	:= --gcc-toolchain=$(GCC_TOOLCHAIN)
+endif
+KBUILD_CFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC)
+KBUILD_AFLAGS += $(CLANG_TARGET) $(CLANG_GCC_TC)
 KBUILD_CPPFLAGS += $(call cc-option,-Qunused-arguments,)
-KBUILD_CPPFLAGS += $(call cc-option,-Wno-unknown-warning-option,)
-KBUILD_CFLAGS += $(call cc-disable-warning, unused-variable)
+KBUILD_CFLAGS += $(call cc-disable-warning, unused-const-variable)
 KBUILD_CFLAGS += $(call cc-disable-warning, format-invalid-specifier)
 KBUILD_CFLAGS += $(call cc-disable-warning, gnu)
+KBUILD_CFLAGS += $(call cc-disable-warning, address-of-packed-member)
+KBUILD_CFLAGS += $(call cc-disable-warning, duplicate-decl-specifier)
 # Quiet clang warning: comparison of unsigned expression < 0 is always false
 KBUILD_CFLAGS += $(call cc-disable-warning, tautological-compare)
 # CLANG uses a _MergedGlobals as optimization, but this breaks modpost, as the
@@ -715,6 +870,8 @@ KBUILD_CFLAGS += $(call cc-disable-warning, tautological-compare)
 # See modpost pattern 2
 KBUILD_CFLAGS += $(call cc-option, -mno-global-merge,)
 KBUILD_CFLAGS += $(call cc-option, -fcatch-undefined-behavior)
+KBUILD_CFLAGS += $(call cc-option, -no-integrated-as)
+KBUILD_AFLAGS += $(call cc-option, -no-integrated-as)
 else
 
 # These warnings generated too much noise in a regular build.
@@ -814,6 +971,10 @@ KBUILD_CFLAGS   += $(call cc-option,-Werror=strict-prototypes)
 
 # Prohibit date/time macros, which would make the build non-deterministic
 KBUILD_CFLAGS   += $(call cc-option,-Werror=date-time)
+
+# temporary workaround clang build errors
+KBUILD_CFLAGS   += $(call cc-disable-warning,unknown-warning-option,)
+KBUILD_CFLAGS   += $(call cc-disable-warning,enum-conversion,)
 
 # enforce correct pointer usage
 KBUILD_CFLAGS   += $(call cc-option,-Werror=incompatible-pointer-types)
@@ -1079,6 +1240,22 @@ prepare-objtool: $(objtool_target)
 # CC_STACKPROTECTOR_STRONG! Why did it build with _REGULAR?!")
 PHONY += prepare-compiler-check
 prepare-compiler-check: FORCE
+# Make sure we're using a supported toolchain with LTO_CLANG
+ifdef CONFIG_LTO_CLANG
+  ifneq ($(call clang-ifversion, -ge, 0500, y), y)
+	@echo Cannot use CONFIG_LTO_CLANG: requires clang 5.0 or later >&2 && exit 1
+  endif
+  ifneq ($(call gold-ifversion, -ge, 112000000, y), y)
+	@echo Cannot use CONFIG_LTO_CLANG: requires GNU gold 1.12 or later >&2 && exit 1
+  endif
+endif
+# Make sure compiler supports LTO flags
+ifdef lto-flags
+  ifeq ($(call cc-option, $(lto-flags)),)
+	@echo Cannot use CONFIG_LTO: $(lto-flags) not supported by compiler \
+		>&2 && exit 1
+  endif
+endif
 # Make sure compiler supports requested stack protector flag.
 ifdef stackp-name
   ifeq ($(call cc-option, $(stackp-flag)),)
@@ -1091,6 +1268,11 @@ ifdef stackp-check
   ifneq ($(shell $(CONFIG_SHELL) $(stackp-check) $(CC) $(KBUILD_CPPFLAGS) $(biarch)),y)
 	@echo Cannot use CONFIG_CC_STACKPROTECTOR_$(stackp-name): \
                   $(stackp-flag) available but compiler is broken >&2 && exit 1
+  endif
+endif
+ifdef cfi-flags
+  ifeq ($(call cc-option, $(cfi-flags)),)
+	@echo Cannot use CONFIG_CFI: $(cfi-flags) not supported by compiler >&2 && exit 1
   endif
 endif
 	@:
@@ -1378,6 +1560,8 @@ help:
 	@echo  '                    (default: $$(INSTALL_MOD_PATH)/lib/firmware)'
 	@echo  '  dir/            - Build all files in dir and below'
 	@echo  '  dir/file.[ois]  - Build specified target only'
+	@echo  '  dir/file.ll     - Build the LLVM assembly file'
+	@echo  '                    (requires compiler support for LLVM assembly generation)'
 	@echo  '  dir/file.lst    - Build specified mixed source/assembly target only'
 	@echo  '                    (requires a recent binutils and recent build (System.map))'
 	@echo  '  dir/file.ko     - Build module including final link'
@@ -1562,7 +1746,9 @@ clean: $(clean-dirs)
 		-o -name '*.symtypes' -o -name 'modules.order' \
 		-o -name modules.builtin -o -name '.tmp_*.o.*' \
 		-o -name '*.c.[012]*.*' \
-		-o -name '*.gcno' \) -type f -print | xargs rm -f
+		-o -name '*.ll' \
+		-o -name '*.gcno' \
+		-o -name '*.*.symversions' \) -type f -print | xargs rm -f
 
 # Generate tags for editors
 # ---------------------------------------------------------------------------
@@ -1664,6 +1850,8 @@ endif
 %.o: %.S prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.symtypes: %.c prepare scripts FORCE
+	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+%.ll: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 
 # Modules
