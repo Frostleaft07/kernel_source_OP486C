@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.119 Kernel Configuration
+# Linux/arm64 4.9.117 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -4443,7 +4443,7 @@ CONFIG_QUOTACTL=y
 # CONFIG_AUTOFS4_FS is not set
 CONFIG_FUSE_FS=y
 # CONFIG_CUSE is not set
-# CONFIG_OVERLAY_FS is not set
+CONFIG_OVERLAY_FS=y
 
 #
 # Caches
