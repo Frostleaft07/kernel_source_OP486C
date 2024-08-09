@@ -33,6 +33,10 @@ jobs:
       run: |
         ./setupT
 
+    - name: setup KernelSU v0.9.5
+      run: |
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
+
     - name: Start Building Kernel
       run: |
         ./build
@@ -41,14 +45,14 @@ jobs:
       run: |
         git clone https://github.com/nathannxx/AnyKernel3 ~/any/ && \
         mv ~/out/arch/arm64/boot/Image.gz-dtb ~/any/ && \
-        cd ~/any/ && zip -r9 BuildTest-${{ github.run_id }}.zip *
+        cd ~/any/ && zip -r9 BuildTest-KSU-${{ github.run_id }}.zip *
 
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          /home/runner/any/BuildTest-${{ github.run_id }}.zip
+          /home/runner/any/BuildTest-KSU-${{ github.run_id }}.zip
         name: BuildTest
-        tag_name: buildtest
+        tag_name: KernelSU
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
