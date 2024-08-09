@@ -1,0 +1,19 @@
+#!/bin/bash
+
+export KBUILD_BUILD_USER=Frostleaf
+export KBUILD_BUILD_HOST=Darkness
+echo $KBUILD_BUILD_USER
+echo $KBUILD_BUILD_HOST
+export LOCALVERSION="-endfield"
+echo -e "done?"
+sleep 2s
+
+C=$(pwd)/clang/bin
+Z3=$(pwd)/x32/bin/
+Z4=$(pwd)/x64/bin
+make CC=$C/clang ARCH=arm64 O=~/out OP_defconfig
+make CC=$C/clang ARCH=arm64 O=~/out -j16 \
+        HEADER_ARCH=arm64 \
+        SUBARCH=arm64 \
+        CROSS_COMPILE=$Z4/aarch64-linux-android- \
+        CROSS_COMPILE_ARM32=$Z3/arm-linux-androideabi- \
