@@ -26,7 +26,7 @@ jobs:
 
     - name: Packages
       run: |
-        wget https://raw.githubusercontent.com/Frostleaft07/android_kernel_realme_mt6765/Nethunter/S ; chmod +x S ; ./S
+        ./S
         sudo apt install libtinfo5 -y
 
     - name: setup tools
