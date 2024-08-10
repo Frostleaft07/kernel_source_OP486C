@@ -37,10 +37,6 @@ jobs:
       run: |
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
 
-    - name: clean before build
-      run: |
-        make mrproper ; make clean
-
     - name: Start Building Kernel
       run: |
         ./build
