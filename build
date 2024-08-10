@@ -9,7 +9,7 @@ echo -e "done?"
 sleep 2s
 
 C=$(pwd)/clang/bin
-Z3=$(pwd)/x32/bin/
+Z3=$(pwd)/x32/bin
 Z4=$(pwd)/x64/bin
 make CC=$C/clang ARCH=arm64 O=~/out OP_defconfig
 make CC=$C/clang ARCH=arm64 O=~/out -j16 \
