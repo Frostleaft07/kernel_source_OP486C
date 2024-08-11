@@ -29,6 +29,10 @@ jobs:
         ./S
         sudo apt install libtinfo5 -y
 
+    - name: check clang and gcc version
+      run: |
+        gcc -v ; clang -v
+
     - name: setup tools
       run: |
         ./setupT
@@ -37,23 +41,18 @@ jobs:
       run: |
         ./build
 
-    - name: Set Properties
-      id: props
-      run: |
-        echo "date=$(TZ=Asia/Manila date +%Y%m%d-%I%M%p)" >> $GITHUB_OUTPUT
-
     - name: Compressed as Archive
       run: |
         git clone https://github.com/nathannxx/AnyKernel3 ~/any/ && \
         mv ~/out/arch/arm64/boot/Image.gz-dtb ~/any/ && \
-        cd ~/any/ && zip -r9 BuildTest-${{ github.run_id }}.zip *
+        cd ~/any/ && zip -r9 BuildTest-upstream-${{ github.run_id }}.zip *
 
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          /home/runner/any/BuildTest-${{ github.run_id }}.zip
-        name: BuildTest-${{ github.run_id }}
-        tag_name: ${{ github.run_id }}
+          /home/runner/any/BuildTest-upstream-${{ github.run_id }}.zip
+        name: upstream
+        tag_name: upstream
       env:
         GITHUB_TOKEN: ${{ secrets.MY_TOKEN }}
