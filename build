@@ -15,5 +15,5 @@ make CC=$C/clang ARCH=arm64 O=~/out OP_defconfig
 make CC=$C/clang ARCH=arm64 O=~/out -j16 \
         HEADER_ARCH=arm64 \
         SUBARCH=arm64 \
-        CROSS_COMPILE=$Z4/aarch64-linux-android- \
-        CROSS_COMPILE_ARM32=$Z3/arm-linux-androideabi- \
+        CROSS_COMPILE=aarch64-linux-gnu- \
+        CROSS_COMPILE_ARM32=arm-linux-gnueabi-
