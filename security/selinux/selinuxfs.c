@@ -40,6 +40,10 @@
 #include "security.h"
 #include "objsec.h"
 #include "conditional.h"
+#ifdef VENDOR_EDIT
+//Jiemin.Zhu@PSW.AD.SELinux.1568755, 2017/01/13, Add for disable selinux denied in MP version
+#include "proc.h"
+#endif /* VENDOR_EDIT */
 
 /* Policy capability filenames */
 static char *policycap_names[] = {
@@ -134,8 +138,15 @@ static ssize_t sel_read_enforce(struct file *filp, char __user *buf,
 {
 	char tmpbuf[TMPBUFLEN];
 	ssize_t length;
-
+#ifdef VENDOR_EDIT
+/* Xianlin.Wu@ROM.Security, 2019/07/27, add for disallow toggling the kernel
+ * between enforcing mode and permissive mode via /selinux/enforce or
+ * selinux_enforcing symbol in normal/silence mode of release build.
+ */
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%d", is_selinux_enforcing());
+#else
 	length = scnprintf(tmpbuf, TMPBUFLEN, "%d", selinux_enforcing);
+#endif /* VENDOR_EDIT */
 	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
 }
 
@@ -173,10 +184,21 @@ static ssize_t sel_write_enforce(struct file *file, const char __user *buf,
 			from_kuid(&init_user_ns, audit_get_loginuid(current)),
 			audit_get_sessionid(current));
 		selinux_enforcing = new_value;
+#ifdef VENDOR_EDIT
+/* Xianlin.Wu@ROM.Security, 2019/07/27, add for disallow toggling the kernel
+ * between enforcing mode and permissive mode via /selinux/enforce or
+ * selinux_enforcing symbol in normal/silence mode of release build.
+ */
+		if (is_selinux_enforcing())
+			avc_ss_reset(0);
+		selnl_notify_setenforce(is_selinux_enforcing());
+		selinux_status_update_setenforce(is_selinux_enforcing());
+#else
 		if (selinux_enforcing)
 			avc_ss_reset(0);
 		selnl_notify_setenforce(selinux_enforcing);
 		selinux_status_update_setenforce(selinux_enforcing);
+#endif /* VENDOR_EDIT */
 	}
 	length = count;
 out:
@@ -1478,7 +1500,7 @@ static const struct file_operations sel_avc_cache_stats_ops = {
 static int sel_make_avc_files(struct dentry *dir)
 {
 	int i;
-	static struct tree_descr files[] = {
+	static const struct tree_descr files[] = {
 		{ "cache_threshold",
 		  &sel_avc_cache_threshold_ops, S_IRUGO|S_IWUSR },
 		{ "hash_stats", &sel_avc_hash_stats_ops, S_IRUGO },
@@ -1787,7 +1809,7 @@ static int sel_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *inode;
 	struct inode_security_struct *isec;
 
-	static struct tree_descr selinux_files[] = {
+	static const struct tree_descr selinux_files[] = {
 		[SEL_LOAD] = {"load", &sel_load_ops, S_IRUSR|S_IWUSR},
 		[SEL_ENFORCE] = {"enforce", &sel_enforce_ops, S_IRUGO|S_IWUSR},
 		[SEL_CONTEXT] = {"context", &transaction_ops, S_IRUGO|S_IWUGO},
@@ -1918,6 +1940,10 @@ static int __init init_sel_fs(void)
 		selinuxfs_mount = NULL;
 	}
 
+    #ifdef VENDOR_EDIT
+     //Jiemin.Zhu@PSW.AD.SELinux.1568755, 2017/01/13, Add for disable selinux denied in MP version
+	init_denied_proc();
+    #endif /* VENDOR_EDIT */
 	return err;
 }
 

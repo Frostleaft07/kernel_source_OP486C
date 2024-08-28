@@ -67,6 +67,18 @@
 
 #include <trace/events/sched.h>
 
+#include <mt-plat/mtk_pidmap.h>
+#ifdef VENDOR_EDIT /*ChenYong@Rom.Framework,2019/01/15, add for execve blocking(root defence)*/
+#ifdef OPPO_DISALLOW_KEY_INTERFACES
+#if defined(CONFIG_OPPO_EXECVE_BLOCK) || defined(CONFIG_OPPO_EXECVE_REPORT)
+#ifdef CONFIG_OPPO_KEVENT_UPLOAD
+#include <linux/oppo_kevent.h>
+#include <linux/cred.h>
+#endif /* CONFIG_OPPO_KEVENT_UPLOAD */
+#endif /* CONFIG_OPPO_EXECVE_BLOCK or CONFIG_OPPO_EXECVE_REPORT*/
+#endif /* OPPO_DISALLOW_KEY_INTERFACES */
+#endif /* VENDOR_EDIT*/
+
 int suid_dumpable = 0;
 
 static LIST_HEAD(formats);
@@ -1249,6 +1261,7 @@ void __set_task_comm(struct task_struct *tsk, const char *buf, bool exec)
 	strlcpy(tsk->comm, buf, sizeof(tsk->comm));
 	task_unlock(tsk);
 	perf_event_comm(tsk, exec);
+	mtk_pidmap_update(tsk);
 }
 
 int flush_old_exec(struct linux_binprm * bprm)
@@ -1303,7 +1316,7 @@ EXPORT_SYMBOL(flush_old_exec);
 void would_dump(struct linux_binprm *bprm, struct file *file)
 {
 	struct inode *inode = file_inode(file);
-	if (inode_permission(inode, MAY_READ) < 0) {
+	if (inode_permission2(file->f_path.mnt, inode, MAY_READ) < 0) {
 		struct user_namespace *old, *user_ns;
 		bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP;
 
@@ -1671,6 +1684,133 @@ static int exec_binprm(struct linux_binprm *bprm)
 	return ret;
 }
 
+#ifdef VENDOR_EDIT /*ChenYong@Rom.Framework,2019/01/15, add for execve blocking(root defence)*/
+#ifdef OPPO_DISALLOW_KEY_INTERFACES
+
+
+#if defined(CONFIG_OPPO_EXECVE_BLOCK) || defined(CONFIG_OPPO_EXECVE_REPORT)
+static int boot_state = -1;
+int get_oem_boot_state(void)
+{
+    if (strstr(saved_command_line, "androidboot.verifiedbootstate=orange")) {
+        boot_state = 0;
+    } else {
+        boot_state = 1;
+    }
+    return 0;
+}
+
+bool b_oem_unlocked(void)
+{
+    if (boot_state == -1) {
+        get_oem_boot_state();
+        printk(KERN_INFO "oppo_root_check,is_unlocked:%d\n",(boot_state == 0));
+    }
+    return (boot_state == 0);
+}
+static void oppo_report_execveat(const char *path, const char* dcs_event_id)
+{
+#ifdef CONFIG_OPPO_KEVENT_UPLOAD
+	struct kernel_packet_info* dcs_event;
+	char dcs_stack[sizeof(struct kernel_packet_info) + 256];
+	const char* dcs_event_tag = "kernel_event";
+	// const char* dcs_event_id = "execve_report";
+	char* dcs_event_payload = NULL;
+	int uid = current_uid().val;
+	//const struct cred *cred = current_cred();
+
+	dcs_event = (struct kernel_packet_info*)dcs_stack;
+	dcs_event_payload = dcs_stack +
+		sizeof(struct kernel_packet_info);
+
+	dcs_event->type = 3;
+
+	strncpy(dcs_event->log_tag, dcs_event_tag,
+		sizeof(dcs_event->log_tag));
+	strncpy(dcs_event->event_id, dcs_event_id,
+		sizeof(dcs_event->event_id));
+
+	dcs_event->payload_length = snprintf(dcs_event_payload, 256,
+		"%d,path@@%s", uid, path);
+	if (dcs_event->payload_length < 256) {
+		dcs_event->payload_length += 1;
+	}
+	kevent_send_to_user(dcs_event);
+
+#endif /* CONFIG_OPPO_KEVENT_UPLOAD */
+	printk(KERN_ERR "=======>[kevent_send_to_user:execve]:common %s result %s\n", path, dcs_event_id);
+}
+#endif /* (CONFIG_OPPO_EXECVE_BLOCK) || (CONFIG_OPPO_EXECVE_REPORT)*/
+
+#if defined(CONFIG_OPPO_EXECVE_BLOCK) || defined(CONFIG_OPPO_EXECVE_REPORT)
+static int oppo_check_execveat_perm(struct file* filp)
+{
+	char *absolute_path_buf = NULL;
+	char *absolute_path = NULL;
+	char *context = NULL;
+	u32 context_len = 0;
+	int rc = 0;
+	int retval = 0;
+
+	/*if (!uid_eq(current_uid(), GLOBAL_ROOT_UID))
+		goto out_ret;*/
+
+	absolute_path_buf = (char *)__get_free_page(GFP_KERNEL);
+	retval = -ENOMEM;
+	if (absolute_path_buf == NULL)
+		goto out_ret;
+
+	absolute_path = d_path(&filp->f_path, absolute_path_buf, PAGE_SIZE);
+	retval = PTR_ERR(absolute_path);
+	if (IS_ERR(absolute_path))
+                goto out_free;
+
+	retval = 0;
+	if (strncmp(absolute_path, "/data", 5))
+		goto out_free;
+	//ChenYong@Plt.Framework, 2018/11/30, add for vts test.
+	if (!strncmp(absolute_path, "/data/local/tmp", 15)) {
+		goto out_free;
+	}
+	//add end
+	if (!uid_eq(current_uid(), GLOBAL_ROOT_UID)) {
+#ifdef CONFIG_OPPO_EXECVE_REPORT
+		oppo_report_execveat(absolute_path, "execve_report");
+#endif /* CONFIG_OPPO_EXECVE_REPORT */
+	} else {
+#ifdef CONFIG_OPPO_EXECVE_BLOCK
+		rc = get_current_security_context(&context, &context_len);
+		retval = -EPERM;
+		if (rc) {
+			oppo_report_execveat(absolute_path, "execve_block");
+			goto out_free;
+		}
+
+		retval = -EPERM;
+		if (strncmp(context, "u:r:rutilsdaemon:s0", 19)) {
+			oppo_report_execveat(absolute_path, "execve_block");
+			goto out_free;
+		}
+
+		printk(KERN_NOTICE "xxxxx =======>[execve]:rutils %s\n", absolute_path);
+#endif /* CONFIG_OPPO_EXECVE_BLOCK */
+	}
+
+	retval = 0;
+
+out_free:
+	kfree(context);
+	free_page((unsigned long)absolute_path_buf);
+
+out_ret:
+	return retval;
+}
+#endif /* CONFIG_OPPO_EXECVE_BLOCK or CONFIG_OPPO_EXECVE_REPORT*/
+
+#endif /* OPPO_DISALLOW_KEY_INTERFACES */
+#endif /* VENDOR_EDIT */
+
+
 /*
  * sys_execve() executes a new program.
  */
@@ -1724,6 +1864,21 @@ static int do_execveat_common(int fd, struct filename *filename,
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out_unmark;
+
+#ifdef VENDOR_EDIT /*ChenYong@Rom.Framework,2019/01/15, add for execve blocking(root defence)*/
+#ifdef OPPO_DISALLOW_KEY_INTERFACES
+#if defined(CONFIG_OPPO_EXECVE_BLOCK) || defined(CONFIG_OPPO_EXECVE_REPORT)
+    //printk("kevent exec check, is_unlocked:%d\n", is_oem_unlocked());
+	if (!b_oem_unlocked()) {
+		retval = oppo_check_execveat_perm(file);
+		if (retval < 0) {
+			fput(file);
+			goto out_unmark;
+		}
+	}
+#endif /* CONFIG_OPPO_EXECVE_BLOCK or CONFIG_OPPO_EXECVE_REPORT */
+#endif /* OPPO_DISALLOW_KEY_INTERFACES */
+#endif /* VENDOR_EDIT */
 
 	sched_exec();
 

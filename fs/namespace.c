@@ -26,6 +26,15 @@
 #include <linux/task_work.h>
 #include "pnode.h"
 #include "internal.h"
+#ifdef VENDOR_EDIT
+/*ChenYong@Rom.Framework,2019/01/15, Add for mount report(root defence)*/
+#include <mt-plat/mtk_boot_common.h>
+#ifdef OPPO_DISALLOW_KEY_INTERFACES
+#ifdef CONFIG_OPPO_KEVENT_UPLOAD
+#include <linux/oppo_kevent.h>
+#endif /* CONFIG_OPPO_KEVENT_UPLOAD */
+#endif /* OPPO_DISALLOW_KEY_INTERFACES */
+#endif /* VENDOR_EDIT*/
 
 /* Maximum number of mounts in a mount namespace */
 unsigned int sysctl_mount_max __read_mostly = 100000;
@@ -227,6 +236,7 @@ static struct mount *alloc_vfsmnt(const char *name)
 		mnt->mnt_count = 1;
 		mnt->mnt_writers = 0;
 #endif
+		mnt->mnt.data = NULL;
 
 		INIT_HLIST_NODE(&mnt->mnt_hash);
 		INIT_LIST_HEAD(&mnt->mnt_child);
@@ -581,6 +591,7 @@ int sb_prepare_remount_readonly(struct super_block *sb)
 
 static void free_vfsmnt(struct mount *mnt)
 {
+	kfree(mnt->mnt.data);
 	kfree_const(mnt->mnt_devname);
 #ifdef CONFIG_SMP
 	free_percpu(mnt->mnt_pcp);
@@ -603,12 +614,21 @@ int __legitimize_mnt(struct vfsmount *bastard, unsigned seq)
 		return 0;
 	mnt = real_mount(bastard);
 	mnt_add_count(mnt, 1);
+	smp_mb();			// see mntput_no_expire()
 	if (likely(!read_seqretry(&mount_lock, seq)))
 		return 0;
 	if (bastard->mnt_flags & MNT_SYNC_UMOUNT) {
 		mnt_add_count(mnt, -1);
 		return 1;
 	}
+	lock_mount_hash();
+	if (unlikely(bastard->mnt_flags & MNT_DOOMED)) {
+		mnt_add_count(mnt, -1);
+		unlock_mount_hash();
+		return 1;
+	}
+	unlock_mount_hash();
+	/* caller will mntput() */
 	return -1;
 }
 
@@ -740,7 +760,7 @@ mountpoint:
 	}
 
 	if (!new)
-		new = kmalloc(sizeof(struct mountpoint), GFP_KERNEL);
+		new = kmalloc(sizeof(struct mountpoint), GFP_NOFS);
 	if (!new)
 		return ERR_PTR(-ENOMEM);
 
@@ -975,10 +995,18 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
 
+	if (type->alloc_mnt_data) {
+		mnt->mnt.data = type->alloc_mnt_data();
+		if (!mnt->mnt.data) {
+			mnt_free_id(mnt);
+			free_vfsmnt(mnt);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
 	if (flags & MS_KERNMOUNT)
 		mnt->mnt.mnt_flags = MNT_INTERNAL;
 
-	root = mount_fs(type, flags, name, data);
+	root = mount_fs(type, flags, name, &mnt->mnt, data);
 	if (IS_ERR(root)) {
 		mnt_free_id(mnt);
 		free_vfsmnt(mnt);
@@ -1021,6 +1049,14 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	mnt = alloc_vfsmnt(old->mnt_devname);
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
+
+	if (sb->s_op->clone_mnt_data) {
+		mnt->mnt.data = sb->s_op->clone_mnt_data(old->mnt.data);
+		if (!mnt->mnt.data) {
+			err = -ENOMEM;
+			goto out_free;
+		}
+	}
 
 	if (flag & (CL_SLAVE | CL_PRIVATE | CL_SHARED_TO_SLAVE))
 		mnt->mnt_group_id = 0; /* not a peer of original */
@@ -1139,12 +1175,27 @@ static DECLARE_DELAYED_WORK(delayed_mntput_work, delayed_mntput);
 static void mntput_no_expire(struct mount *mnt)
 {
 	rcu_read_lock();
-	mnt_add_count(mnt, -1);
-	if (likely(mnt->mnt_ns)) { /* shouldn't be the last one */
+	if (likely(READ_ONCE(mnt->mnt_ns))) {
+		/*
+		 * Since we don't do lock_mount_hash() here,
+		 * ->mnt_ns can change under us.  However, if it's
+		 * non-NULL, then there's a reference that won't
+		 * be dropped until after an RCU delay done after
+		 * turning ->mnt_ns NULL.  So if we observe it
+		 * non-NULL under rcu_read_lock(), the reference
+		 * we are dropping is not the final one.
+		 */
+		mnt_add_count(mnt, -1);
 		rcu_read_unlock();
 		return;
 	}
 	lock_mount_hash();
+	/*
+	 * make sure that if __legitimize_mnt() has not seen us grab
+	 * mount_lock, we'll see their refcount increment here.
+	 */
+	smp_mb();
+	mnt_add_count(mnt, -1);
 	if (mnt_get_count(mnt)) {
 		rcu_read_unlock();
 		unlock_mount_hash();
@@ -2306,8 +2357,14 @@ static int do_remount(struct path *path, int flags, int mnt_flags,
 		err = change_mount_flags(path->mnt, flags);
 	else if (!capable(CAP_SYS_ADMIN))
 		err = -EPERM;
-	else
-		err = do_remount_sb(sb, flags, data, 0);
+	else {
+		err = do_remount_sb2(path->mnt, sb, flags, data, 0);
+		namespace_lock();
+		lock_mount_hash();
+		propagate_remount(mnt);
+		unlock_mount_hash();
+		namespace_unlock();
+	}
 	if (!err) {
 		lock_mount_hash();
 		mnt_flags |= mnt->mnt.mnt_flags & ~MNT_USER_SETTABLE_MASK;
@@ -2743,6 +2800,54 @@ long do_mount(const char *dev_name, const char __user *dir_name,
 	struct path path;
 	int retval = 0;
 	int mnt_flags = 0;
+
+#ifdef VENDOR_EDIT /*ChenYong@Rom.Framework,2019/01/15, add for mount report(root defence)*/
+#ifdef OPPO_DISALLOW_KEY_INTERFACES
+#ifdef CONFIG_OPPO_KEVENT_UPLOAD
+	struct kernel_packet_info* dcs_event;
+	char dcs_stack[sizeof(struct kernel_packet_info) + 256];
+	const char* dcs_event_tag = "kernel_event";
+	const char* dcs_event_id = "mount_report";
+	char* dcs_event_payload = NULL;
+#endif /* CONFIG_OPPO_KEVENT_UPLOAD */
+#endif /* OPPO_DISALLOW_KEY_INTERFACES */
+#endif /* VENDOR_EDIT*/
+
+#if defined(VENDOR_EDIT) && defined(OPPO_DISALLOW_KEY_INTERFACES)
+/* Zhengkang.Ji@ROM.Frameworks.Security, 2018-04-05
+ * System partition is not permitted to be mounted with "rw".
+ */
+ 	char dname[16] = {0};
+	if (dir_name != NULL && copy_from_user(dname,dir_name,8) == 0){
+		if ((!strncmp(dname, "/system", 8) || !strncmp(dname, "/vendor", 8))&& !(flags & MS_RDONLY)
+			&& (get_boot_mode() == NORMAL_BOOT)) {
+			printk(KERN_ERR "[OPPO]System partition is not permitted to be mounted as readwrite\n");
+#ifdef CONFIG_OPPO_KEVENT_UPLOAD
+/*Shengyang.Luo@Plt.Framework, 2017/12/27, add for mount report(root defence)*/
+		printk(KERN_ERR "do_mount:kevent_send_to_user\n");
+
+		dcs_event = (struct kernel_packet_info*)dcs_stack;
+		dcs_event_payload = dcs_stack +
+		sizeof(struct kernel_packet_info);
+
+		dcs_event->type = 2;
+
+		strncpy(dcs_event->log_tag, dcs_event_tag,
+			sizeof(dcs_event->log_tag));
+		strncpy(dcs_event->event_id, dcs_event_id,
+			sizeof(dcs_event->event_id));
+
+		dcs_event->payload_length = snprintf(dcs_event_payload, 256, "partition@@system");
+		if (dcs_event->payload_length < 256) {
+			dcs_event->payload_length += 1;
+		}
+
+		kevent_send_to_user(dcs_event);
+#endif /* CONFIG_OPPO_KEVENT_UPLOAD */
+			return -EPERM;
+		}
+	}
+#endif /* VENDOR_EDIT */
 
 	/* Discard magic */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)

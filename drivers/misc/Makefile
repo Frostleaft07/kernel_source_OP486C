@@ -53,6 +53,22 @@ obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
 obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_PANEL)             += panel.o
+#ifdef  ODM_HQ_EDIT
+#zhangmengchun@ODM.BSP.system  2018/11/29 add for board id
+obj-$(CONFIG_GET_BOARD_ID) 	+= board_id.o
+#duwenchao@ODM_HQ.BSP.System.devinfo, 2018/12/07 add devinfo fs.
+obj-$(CONFIG_HQ_DEVINFO_SUPPORT) 	+= hqdevinfo/
+#endif #ODM_HQ_EDIT
+
+obj-$(CONFIG_UID_SYS_STATS)	+= uid_sys_stats.o
+obj-$(CONFIG_MEMORY_STATE_TIME)	+= memory_state_time.o
+obj-$(CONFIG_ARCH_MEDIATEK) += mediatek/
+obj-$(CONFIG_MEDIATEK_SOLUTION) += mediatek/
+#ifdef VENDOR_EDIT
+# xing.xiong@BSP.Kernel.Debug, 2018/10/01, Add for motor
+obj-$(CONFIG_OPPO_MOTOR)		+= motor.o
+obj-$(CONFIG_OPPO_MOTOR)		+= oppo_motor/
+#endif
 
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_core.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_bugs.o
@@ -61,6 +77,7 @@ lkdtm-$(CONFIG_LKDTM)		+= lkdtm_perms.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_rodata_objcopy.o
 lkdtm-$(CONFIG_LKDTM)		+= lkdtm_usercopy.o
 
+CFLAGS_lkdtm_rodata.o		+= $(DISABLE_LTO)
 KCOV_INSTRUMENT_lkdtm_rodata.o	:= n
 
 OBJCOPYFLAGS :=

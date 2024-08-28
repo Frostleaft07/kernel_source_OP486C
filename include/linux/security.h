@@ -1662,6 +1662,54 @@ static inline void securityfs_remove(struct dentry *dentry)
 
 #endif
 
+#ifdef CONFIG_BPF_SYSCALL
+union bpf_attr;
+struct bpf_map;
+struct bpf_prog;
+struct bpf_prog_aux;
+#ifdef CONFIG_SECURITY
+extern int security_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+extern int security_bpf_map(struct bpf_map *map, fmode_t fmode);
+extern int security_bpf_prog(struct bpf_prog *prog);
+extern int security_bpf_map_alloc(struct bpf_map *map);
+extern void security_bpf_map_free(struct bpf_map *map);
+extern int security_bpf_prog_alloc(struct bpf_prog_aux *aux);
+extern void security_bpf_prog_free(struct bpf_prog_aux *aux);
+#else
+static inline int security_bpf(int cmd, union bpf_attr *attr,
+					     unsigned int size)
+{
+	return 0;
+}
+
+static inline int security_bpf_map(struct bpf_map *map, fmode_t fmode)
+{
+	return 0;
+}
+
+static inline int security_bpf_prog(struct bpf_prog *prog)
+{
+	return 0;
+}
+
+static inline int security_bpf_map_alloc(struct bpf_map *map)
+{
+	return 0;
+}
+
+static inline void security_bpf_map_free(struct bpf_map *map)
+{ }
+
+static inline int security_bpf_prog_alloc(struct bpf_prog_aux *aux)
+{
+	return 0;
+}
+
+static inline void security_bpf_prog_free(struct bpf_prog_aux *aux)
+{ }
+#endif /* CONFIG_SECURITY */
+#endif /* CONFIG_BPF_SYSCALL */
+
 #ifdef CONFIG_SECURITY
 
 static inline char *alloc_secdata(void)
@@ -1684,6 +1732,22 @@ static inline char *alloc_secdata(void)
 static inline void free_secdata(void *secdata)
 { }
 #endif /* CONFIG_SECURITY */
+
+#ifdef VENDOR_EDIT
+//Jiemin.Zhu@PSW.Android.SELinux, 2017/11/03, add for security context
+extern int is_oppo_permissive(u32 ssid, u32 tsid, u32 requested);
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT /*ChenYong@Rom.Framework,2019/01/15, add for execve blocking(root defence)*/
+#ifdef CONFIG_SECURITY
+extern int get_current_security_context(char **context, u32 *context_len);
+#else
+static inline int get_current_security_context(char **context, u32 *context_len)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+#endif /* VENDOR_EDIT */
 
 #endif /* ! __LINUX_SECURITY_H */
 
