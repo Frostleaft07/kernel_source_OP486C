@@ -7,4 +7,4 @@ CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-
 # clang 9
 # CLANG_URL=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android10-release/clang-r353983c.tar.gz
 
-mkdir clang ; wget $CLANG_URL  && tar -xzf *.tgz -C clang/
+mkdir clang ; wget $CLANG_URL  && tar -xzf *.gz -C clang/
