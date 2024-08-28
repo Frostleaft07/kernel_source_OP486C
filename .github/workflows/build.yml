@@ -48,6 +48,7 @@ jobs:
       with:
         files: |
           /home/runner/any/BuildTest-${{ github.run_id }}.zip
+          /home/runner/out/drivers/misc/mediatek/met/met.ko
         name: BuildTest
         tag_name: buildtest
       env:
