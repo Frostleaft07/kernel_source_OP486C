@@ -39,7 +39,7 @@
 
 #define HI1336_QTECH_EEPROM 0xA4
 
-enum{
+extern enum{
 	IMGSENSOR_MODE_INIT,
 	IMGSENSOR_MODE_PREVIEW,
 	IMGSENSOR_MODE_CAPTURE,
@@ -53,7 +53,7 @@ enum{
 	IMGSENSOR_MODE_CUSTOM5,
 } IMGSENSOR_MODE;
 
-struct imgsensor_mode_struct {
+extern struct imgsensor_mode_struct {
 	kal_uint32 pclk;
 	kal_uint32 linelength;
 	kal_uint32 framelength;
@@ -73,7 +73,7 @@ struct imgsensor_mode_struct {
 } imgsensor_mode_struct;
 
 /* SENSOR PRIVATE STRUCT FOR VARIABLES*/
-struct imgsensor_struct {
+extern struct imgsensor_struct {
 	kal_uint8 mirror;				//mirrorflip information
 
 	kal_uint8 sensor_mode; //record IMGSENSOR_MODE enum value
@@ -101,7 +101,7 @@ struct imgsensor_struct {
 } imgsensor_struct;
 
 /* SENSOR PRIVATE STRUCT FOR CONSTANT*/
-struct imgsensor_info_struct {
+extern struct imgsensor_info_struct {
 	kal_uint16 sensor_id; //record sensor id defined in Kd_imgsensor.h
 	kal_uint32 checksum_value; //checksum value for Camera Auto Test
 	struct imgsensor_mode_struct pre; //preview scenario
@@ -150,6 +150,7 @@ struct imgsensor_info_struct {
 	kal_uint8  mipi_lane_num;		//mipi lane num
 	kal_uint8  i2c_addr_table[5];
 	kal_uint32  i2c_speed;     //i2c speed
+
 } imgsensor_info_struct;
 
 #ifdef CONFIG_HQ_HARDWARE_INFO
