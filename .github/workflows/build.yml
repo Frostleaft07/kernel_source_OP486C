@@ -39,7 +39,7 @@ jobs:
 
     - name: Compressed as Archive
       run: |
-        git clone https://github.com/nathannxx/AnyKernel3 ~/any/ && \
+        git clone https://github.com/Frostleaft07/AnyKernel3 -b rmx1941 ~/any/ && \
         mv ~/out/arch/arm64/boot/Image.gz-dtb ~/any/ && \
         cd ~/any/ && zip -r9 BuildTest-${{ github.run_id }}.zip *
 
